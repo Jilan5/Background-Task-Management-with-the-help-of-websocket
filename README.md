@@ -110,12 +110,12 @@ graph TD
     class Docker dockerStyle
 
     %% Bold contrasting arrow styles
-    linkStyle 0 stroke:#FF0000,stroke-width:6px
-    linkStyle 1 stroke:#FF6600,stroke-width:6px
-    linkStyle 2 stroke:#0066FF,stroke-width:5px,stroke-dasharray: 8 4
-    linkStyle 3 stroke:#9900FF,stroke-width:5px,stroke-dasharray: 8 4
-    linkStyle 4 stroke:#00CC00,stroke-width:6px
-    linkStyle 5 stroke:#FF3366,stroke-width:5px,stroke-dasharray: 8 4
+    linkStyle 0 stroke:#FF0000,stroke-width:3px
+    linkStyle 1 stroke:#FF6600,stroke-width:3px
+    linkStyle 2 stroke:#0066FF,stroke-width:2px,stroke-dasharray: 8 4
+    linkStyle 3 stroke:#9900FF,stroke-width:2px,stroke-dasharray: 8 4
+    linkStyle 4 stroke:#00CC00,stroke-width:3px
+    linkStyle 5 stroke:#FF3366,stroke-width:2px,stroke-dasharray: 8 4
 ```
 
 ### Visualizing Celery Worker Scaling
