@@ -71,10 +71,163 @@ graph TD
 
 ### Visualizing Docker Container Architecture and Connections
 ```mermaid
+%%{init: {'theme': 'default', 'themeVariables': {'primaryColor': '#ffcc00', 'edgeLabelBackground':'#ffffff', 'tertiaryColor': '#f0f0f0'}}}%%
+%%{config: {'flowchart': {'curve': 'cardinal', 'padding': 20}}}%%
+%%{flowchart: {'nodeSpacing': 80, 'rankSpacing': 120}}%%
+%%{flowchart: {'defaultRenderer': 'dagre'}}%%
+
+graph TD
+    subgraph Docker["🐳 Docker Environment"]
+        A["Web Container<br/>(FastAPI Server)"] 
+        B["Redis Container<br/>(Message Broker)"]
+        C["Worker Container<br/>(Celery Worker)"]
+    end
+    
+    Client["📱 Client<br/>(Browser/App)"]
+
+    %% Bold contrasting arrows
+    A ==>|"Publishes Tasks"| B
+    B ==>|"Sends Task to Process"| C
+    C -.->|"Publishes Progress"| B
+    B -.->|"Updates via Pub/Sub"| A
+    
+    %% Client interactions
+    Client ==>|"HTTP Request"| A
+    A -.->|"🔄 WebSocket Updates"| Client
+
+    %% Enhanced styling
+    classDef fastApiStyle fill:#009688,stroke:#007566,color:white,stroke-width:3px
+    classDef redisStyle fill:#DC382D,stroke:#a9291f,color:white,stroke-width:3px
+    classDef celeryStyle fill:#4e9e40,stroke:#3b7830,color:white,stroke-width:3px
+    classDef clientStyle fill:#4285F4,stroke:#3367d6,color:white,stroke-width:3px
+    classDef dockerStyle fill:#E6F3FF,stroke:#2496ED,color:#333,stroke-width:2px,fill-opacity:0.3
+
+    %% Apply styles
+    class A fastApiStyle
+    class B redisStyle
+    class C celeryStyle
+    class Client clientStyle
+    class Docker dockerStyle
+
+    %% Bold contrasting arrow styles
+    linkStyle 0 stroke:#FF0000,stroke-width:6px
+    linkStyle 1 stroke:#FF6600,stroke-width:6px
+    linkStyle 2 stroke:#0066FF,stroke-width:5px,stroke-dasharray: 8 4
+    linkStyle 3 stroke:#9900FF,stroke-width:5px,stroke-dasharray: 8 4
+    linkStyle 4 stroke:#00CC00,stroke-width:6px
+    linkStyle 5 stroke:#FF3366,stroke-width:5px,stroke-dasharray: 8 4
 ```
 
 ### Visualizing Celery Worker Scaling
+```mermaid
+%%{init: {'theme': 'default', 'themeVariables': {'primaryColor': '#4285f4', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#1a73e8', 'lineColor': '#34a853', 'sectionBkgColor': '#f8f9fa', 'altSectionBkgColor': '#e8f0fe', 'gridColor': '#dadce0', 'tertiaryColor': '#fbbc04', 'background': '#ffffff', 'secondaryColor': '#ea4335', 'fontFamily': 'Arial, sans-serif'}}}%%
+%%{config: {'flowchart': {'curve': 'basis', 'padding': 20}}}%%
+%%{flowchart: {'nodeSpacing': 80, 'rankSpacing': 100}}%%
+
+graph TD
+    subgraph Redis["🔄 Redis Broker"]
+        A["📋 Task Queue<br/>Central Message Hub"]
+    end
+    
+    subgraph Workers["⚙️ Worker Pool"]
+        B["🔨 Worker 1<br/>Processing Tasks"]
+        C["🔨 Worker 2<br/>Processing Tasks"] 
+        D["🔨 Worker N<br/>Processing Tasks"]
+    end
+    
+    subgraph Web["🌐 Web Layer"]
+        E["🚀 FastAPI Server<br/>REST & WebSocket"]
+    end
+    
+    subgraph Client["👤 Client Side"]
+        F["📱 Browser/App<br/>Real-time Updates"]
+    end
+
+    %% Task flow
+    E -->|"📤 Publish Tasks"| A
+    A -->|"⚡ Assign"| B
+    A -->|"⚡ Assign"| C  
+    A -->|"⚡ Assign"| D
+    
+    %% Progress updates
+    B -->|"📊 Progress Updates"| A
+    C -->|"📊 Progress Updates"| A
+    D -->|"📊 Progress Updates"| A
+    
+    %% Client communication
+    A -->|"📢 Status Updates"| E
+    E -.->|"🔄 WebSocket Stream"| F
+
+    %% Styling
+    classDef redisStyle fill:#ff6b6b,stroke:#d63031,stroke-width:3px,color:#fff
+    classDef workerStyle fill:#74b9ff,stroke:#0984e3,stroke-width:2px,color:#fff
+    classDef webStyle fill:#55a3ff,stroke:#2d3436,stroke-width:3px,color:#fff
+    classDef clientStyle fill:#fd79a8,stroke:#e84393,stroke-width:2px,color:#fff
+
+    class A redisStyle
+    class B,C,D workerStyle
+    class E webStyle
+    class F clientStyle
+```
 ### WebSockets vs HTTP Polling for Task Updates
+```mermaid
+%%{init: {'theme': 'default', 'themeVariables': {'primaryColor': '#4285f4', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#1a73e8', 'lineColor': '#34a853', 'sectionBkgColor': '#f8f9fa', 'altSectionBkgColor': '#e8f0fe', 'gridColor': '#dadce0', 'tertiaryColor': '#fbbc04', 'background': '#ffffff', 'secondaryColor': '#ea4335', 'fontFamily': 'Arial, sans-serif', 'activationBorderColor': '#ff6b6b', 'activationBkgColor': '#ffe6e6'}}}%%
+
+sequenceDiagram
+    autonumber
+    participant C as 📱 Client
+    participant WS as 🚀 WebServer
+    participant R as 🔄 Redis
+    participant W as 🔨 Worker
+
+    Note over C,W: 🔄 **HTTP Polling Approach** 🔄
+    
+    rect rgb(255, 245, 245)
+        C->>+WS: 📤 POST /tasks
+        WS->>+R: 📋 Publish Task ➡️
+        R->>+W: ⚡ Assign Task
+        W-->>-R: 📊 Progress Update ↗️
+        R-->>-WS: ✅ Task Created
+        WS-->>-C: 🆔 Task ID Response
+    end
+    
+    rect rgb(255, 250, 240)
+        loop 🔄 Continuous Polling (Every 2-5s)
+            C->>+WS: 🔍 GET /tasks/{task_id}
+            WS->>+R: 📊 Get Progress
+            R-->>-WS: 📈 Progress Data
+            WS-->>-C: 📋 Response with Progress
+            Note right of C: ⏱️ Wait 2-5 seconds
+        end
+    end
+
+    Note over C,W: ⚡ **WebSocket Real-time Approach** ⚡
+    
+    rect rgb(240, 255, 245)
+        C->>+WS: 🔌 WebSocket Connection
+        WS-->>-C: ✅ Connection Established
+        
+        C->>+WS: 📤 POST /tasks
+        WS->>+R: 📋 Publish Task ➡️
+        R->>+W: ⚡ Assign Task
+        WS-->>C: 🆔 Task ID Response
+    end
+    
+    rect rgb(240, 248, 255)
+        loop 🚀 Real-time Updates (Instant)
+            W-->>R: 📊 Progress Update ↗️
+            R-->>WS: 📢 Publish Progress Event 🚀
+            WS-->>C: 📡 WebSocket Message (Instant)
+        end
+        
+        W-->>R: ✅ Task Completed
+        R-->>WS: 🎉 Completion Event
+        WS-->>C: ✅ Task Complete Notification
+    end
+
+    Note over C,W: 📊 **Comparison Summary** 📊
+    Note over C,WS: 🔄 Polling: Multiple requests, delay<br/>⚡ WebSocket: Single connection, instant
+```
 ---
 
 ## Setting Up the Project
