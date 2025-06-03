@@ -1,56 +1,11 @@
 # Tutorial: Building a Scalable Background Task Processing System with WebSockets, Celery, Redis, and FastAPI
 
 ## Objectives
-In this tutorial, we will:
+In this tutorial, you will:
 1. Learn how to implement WebSocket integration in FastAPI for real-time task updates.
 2. Utilize Celery and Redis for task management and message brokering.
 3. Set up Docker to containerize the application and make it scalable.
 4. Integrate Celery workers and learn how to scale them horizontally.
-
----
-
-## Introduction
-
-Modern applications often require background task processing for handling long-running or resource-intensive operations, such as file processing, sending emails, or generating reports. This tutorial guides you step-by-step to build a FastAPI application that uses:
-- **WebSockets** for real-time updates.
-- **Celery** for background task processing.
-- **Redis** as the message broker.
-- **Docker Compose** for containerized deployment.
-
-By the end of this tutorial, you will have a fully functional application running in Docker that can scale to handle multiple tasks concurrently.
-
----
-
-## Table of Contents
-
-1. [System Architecture](#system-architecture)
-2. [Setting Up the Project](#setting-up-the-project)
-3. [Implementing the Application](#implementing-the-application)
-    - [FastAPI WebSocket Integration](#fastapi-websocket-integration)
-    - [Celery Task Processing](#celery-task-processing)
-4. [Setting Up Docker](#setting-up-docker)
-5. [Scaling Celery Workers](#scaling-celery-workers)
-6. [Testing the Application](#testing-the-application)
-
----
-
-## System Architecture
-
-### Overview
-
-The application consists of:
-1. **FastAPI**: Handles HTTP requests and WebSocket connections.
-2. **Redis**: Acts as a message broker and pub/sub system for real-time updates.
-3. **Celery**: Processes background tasks.
-4. **Docker Compose**: Orchestrates the application components.
-
-### Workflow
-
-1. The client sends a request to create a background task.
-2. FastAPI creates the task and returns a `task_id`.
-3. Celery workers execute the task and publish progress updates to Redis.
-4. FastAPI listens to Redis and broadcasts updates to clients via WebSockets.
-5. The client receives real-time updates about task progress.
 
 ---
 
@@ -168,6 +123,12 @@ async def get_task_status(task_id: str):
     return {"task_id": task_id, "status": task.status, "result": task.result}
 ```
 
+**Description of Code Snippet:**
+- Initializes a **FastAPI** app and sets up a **WebSocket** endpoint for real-time communication.
+- Manages WebSocket connections using the `ConnectionManager` class.
+- Uses Redis pub/sub to listen for updates from Celery tasks and broadcasts them via WebSockets.
+- Exposes HTTP routes to start tasks and fetch task statuses.
+
 ---
 
 ### 2. Celery Task Processing
@@ -196,6 +157,11 @@ def create_task(self, task_length):
     return {"status": "Task completed"}
 ```
 
+**Description of Code Snippet:**
+- Defines a **Celery task** named `create_task` that simulates a long-running task.
+- Publishes task progress updates to Redis, which are later broadcast to WebSocket clients.
+- Uses the `update_state` method to track task progress.
+
 ---
 
 ## Setting Up Docker
@@ -215,9 +181,17 @@ COPY . .
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
+**Description of Code Snippet:**
+- Defines a **Docker image** for the application using the slim version of Python 3.11.
+- Installs dependencies from `requirements.txt` and copies the application code into the container.
+- Runs the FastAPI application using Uvicorn.
+
+---
+
 ### 2. Create `docker-compose.yml`
 
 ```yaml name=docker-compose.yml
+version: '3.8'
 
 services:
   web:
@@ -243,6 +217,14 @@ services:
       - redis
 ```
 
+**Description of Code Snippet:**
+- Configures **Docker Compose** to orchestrate the `web`, `redis`, and `worker` services.
+- The `web` service runs the FastAPI app.
+- The `worker` service runs Celery workers for background task processing.
+- The `redis` service acts as the message broker.
+
+---
+
 ### 3. Create `requirements.txt`
 
 ```text name=requirements.txt
@@ -252,6 +234,9 @@ celery
 redis
 jinja2
 ```
+
+**Description of Code Snippet:**
+- Lists the Python dependencies required for the application, including FastAPI, Celery, Redis, and Jinja2 for templating.
 
 ---
 
@@ -263,6 +248,9 @@ Scale Celery workers using Docker Compose:
 docker-compose up --scale worker=3
 ```
 
+**Description:**
+- This command launches 3 instances of the `worker` service to handle tasks concurrently.
+
 ---
 
 ## Testing the Application
@@ -273,16 +261,29 @@ Run the application using:
 docker-compose up --build
 ```
 
+**Description:**
+- Builds the Docker images and starts the services defined in `docker-compose.yml`.
+
+---
+
 ### Access the Web Interface
 Open your browser and go to:
 ```
 http://localhost:8000
 ```
 
+**Description:**
+- Access the FastAPI web interface to interact with the application.
+
+---
+
 ### Test WebSocket Integration
 1. Open the developer console in your browser.
 2. Go to the "Network" tab and filter for "WS" (WebSocket).
 3. Start a task and observe WebSocket messages in real time.
+
+**Description:**
+- Verify that the WebSocket connection is established and receiving real-time updates for task progress.
 
 ---
 
