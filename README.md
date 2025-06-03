@@ -23,8 +23,7 @@ The project will have the following structure:
 │   ├── templates/
 │   │   └── index.html
 │   ├── static/
-│       └── css/
-│           └── styles.css
+│     
 ├── docker-compose.yml
 ├── Dockerfile
 ├── requirements.txt
@@ -43,24 +42,28 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, Re
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+import json
 import redis
-import asyncio
+from app.celery_worker import create_task  # Fixed import path
 import logging
 import os
-from app.celery_worker import create_task
+import asyncio
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# FastAPI app initialization
+# Initialize FastAPI app
 app = FastAPI(title="Background Task Example")
+
+# Setup templates and static files
 templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# Redis configuration
+# Redis connection
 redis_host = os.getenv("REDIS_HOST", "redis")
-redis_client = redis.Redis(host=redis_host, port=6379, decode_responses=True)
+redis_port = int(os.getenv("REDIS_PORT", 6379))
+redis_client = redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
 pubsub = redis_client.pubsub()
 pubsub.subscribe("task_status")
 
@@ -82,17 +85,22 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# Redis listener to publish updates via WebSockets
+# Redis listener task
 async def redis_listener():
     async def listen():
         while True:
             message = pubsub.get_message(ignore_subscribe_messages=True)
             if message:
-                data = message.get("data")
-                if data:
-                    await manager.broadcast(data)
+                logger.info(f"Received message from Redis: {message}")
+                try:
+                    data = message.get("data")
+                    if data:
+                        await manager.broadcast(data)
+                except Exception as e:
+                    logger.error(f"Error broadcasting message: {e}")
             await asyncio.sleep(0.01)
-
+    
+    # Start the listener in the background
     asyncio.create_task(listen())
 
 @app.on_event("startup")
@@ -108,19 +116,27 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            # Process received data if needed
+            logger.info(f"Received WebSocket data: {data}")
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
 @app.post("/tasks")
 async def add_task(background_tasks: BackgroundTasks):
-    task = create_task.delay(10)
+    # Create a Celery task
+    task = create_task.delay(60)  # Example: 60 seconds task
     return {"task_id": task.id, "status": "Task started"}
 
 @app.get("/tasks/{task_id}")
 async def get_task_status(task_id: str):
     task = create_task.AsyncResult(task_id)
-    return {"task_id": task_id, "status": task.status, "result": task.result}
+    response = {
+        "task_id": task_id,
+        "status": task.status,
+        "result": task.result
+    }
+    return response
 ```
 
 **Description of Code Snippet:**
@@ -137,24 +153,83 @@ async def get_task_status(task_id: str):
 
 ```python name=app/celery_worker.py
 from celery import Celery
+import os
 import time
 import redis
 import json
-import os
+import logging
 
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Celery configuration
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
-celery = Celery("tasks", broker=f"redis://{REDIS_HOST}:6379/0", backend=f"redis://{REDIS_HOST}:6379/0")
+REDIS_PORT = os.getenv("REDIS_PORT", 6379)
+BROKER_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'
+BACKEND_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/0'
 
-redis_client = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
+celery = Celery('tasks',
+                broker=BROKER_URL,
+                backend=BACKEND_URL)
+
+# Enhanced Celery configuration for better Flower integration
+celery.conf.update(
+    result_expires=3600,  # Results will expire after 1 hour
+    task_track_started=True,  # Track when tasks are started
+    task_time_limit=60 * 5,  # Tasks have 5 minutes to run
+    worker_max_tasks_per_child=200,  # Worker processes will be recycled after 200 tasks
+    worker_prefetch_multiplier=4,  # Number of tasks to prefetch per worker process
+    worker_send_task_events=True,  # Send task-related events for Flower
+    task_send_sent_event=True,  # Required for monitoring task execution
+    event_queue_expires=60,  # Event queue expiry time in seconds
+    worker_pool_restarts=True,  # Enable worker pool restarts
+)
+
+# Redis configuration for publishing status updates
+redis_client = redis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    decode_responses=True
+)
 
 @celery.task(name="create_task", bind=True)
 def create_task(self, task_length):
-    for i in range(task_length):
-        progress = int((i + 1) * 100 / task_length)
-        self.update_state(state="PROGRESS", meta={"progress": progress})
-        redis_client.publish("task_status", json.dumps({"task_id": self.request.id, "progress": progress}))
+    """
+    Example background task that runs for a specified amount of time and updates
+    progress through Redis pub/sub
+    """
+    logger.info(f"Task {self.request.id} started, running for {task_length} seconds")
+    
+    total_steps = task_length
+    for step in range(total_steps):
+        # Update progress
+        percentage = int((step + 1) * 100 / total_steps)
+        self.update_state(state="PROGRESS", meta={"progress": percentage})
+        
+        # Publish progress to Redis
+        status_data = {
+            "task_id": self.request.id,
+            "status": "PROGRESS",
+            "progress": percentage
+        }
+        redis_client.publish("task_status", json.dumps(status_data))
+        
+        # Simulate work with sleep
         time.sleep(1)
-    return {"status": "Task completed"}
+    
+    # Final update
+    result = {"status": "Task completed!", "result": 100}
+    
+    # Publish completion to Redis
+    status_data = {
+        "task_id": self.request.id,
+        "status": "COMPLETED",
+        "progress": 100
+    }
+    redis_client.publish("task_status", json.dumps(status_data))
+    
+    return result
 ```
 
 **Description of Code Snippet:**
@@ -173,12 +248,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy application files
 COPY . .
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Set Python path to include the root directory
+ENV PYTHONPATH=/app
+
+# Command to run the application - will be overridden by docker-compose
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 ```
 
 **Description of Code Snippet:**
@@ -191,7 +272,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ### 2. Create `docker-compose.yml`
 
 ```yaml name=docker-compose.yml
-version: '3.8'
+
 
 services:
   web:
@@ -203,18 +284,52 @@ services:
       - "8000:8000"
     depends_on:
       - redis
-      - worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
 
   redis:
     image: redis:alpine
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
 
-  worker:
+  celery-worker:
     build: .
-    command: celery -A app.celery_worker worker --loglevel=info
+    # Enable events for better Flower monitoring
+    command: celery -A app.celery_worker worker --loglevel=info --events
+    volumes:
+      - .:/app
     depends_on:
       - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - C_FORCE_ROOT=true  # To handle the superuser warning
+    deploy:
+      replicas: 2  # Default number of replicas
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+
+  flower:
+    build: .
+    command: celery --broker=redis://redis:6379/0 -A app.celery_worker flower --port=5555
+    ports:
+      - "5555:5555"
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - celery-worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+volumes:
+  redis_data:
 ```
 
 **Description of Code Snippet:**
@@ -228,17 +343,28 @@ services:
 ### 3. Create `requirements.txt`
 
 ```text name=requirements.txt
-fastapi
-uvicorn
-celery
-redis
-jinja2
+fastapi>=0.95.0
+uvicorn>=0.21.1
+jinja2>=3.1.2
+celery>=5.2.7
+redis>=4.5.4
+websockets>=11.0.1
+flower>=2.0.0  # Add Flower for monitoring
 ```
 
 **Description of Code Snippet:**
 - Lists the Python dependencies required for the application, including FastAPI, Celery, Redis, and Jinja2 for templating.
 
 ---
+### Start the Application
+Run the application using:
+```bash
+docker-compose up --build
+```
+**Description:**
+- Builds the Docker images and starts the services defined in `docker-compose.yml`.
+---
+
 
 ## Scaling Celery Workers
 
@@ -253,18 +379,7 @@ docker-compose up --scale worker=3
 
 ---
 
-## Testing the Application
 
-### Start the Application
-Run the application using:
-```bash
-docker-compose up --build
-```
-
-**Description:**
-- Builds the Docker images and starts the services defined in `docker-compose.yml`.
-
----
 
 ### Access the Web Interface
 Open your browser and go to:
