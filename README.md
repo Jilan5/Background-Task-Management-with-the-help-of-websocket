@@ -170,7 +170,8 @@ graph TD
     class F clientStyle
 ```
 ### WebSockets vs HTTP Polling for Task Updates
-```mermaid%%{init: {'theme': 'default', 'themeVariables': {'primaryColor': '#4285f4', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#1a73e8', 'lineColor': '#34a853', 'sectionBkgColor': '#f8f9fa', 'altSectionBkgColor': '#e8f0fe', 'gridColor': '#dadce0', 'tertiaryColor': '#fbbc04', 'background': '#ffffff', 'secondaryColor': '#ea4335', 'fontFamily': 'Arial, sans-serif', 'activationBorderColor': '#ff6b6b', 'activationBkgColor': '#ffe6e6'}}}%%
+```mermaid
+%%{init: {'theme': 'default', 'themeVariables': {'primaryColor': '#4285f4', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#1a73e8', 'lineColor': '#34a853', 'sectionBkgColor': '#f8f9fa', 'altSectionBkgColor': '#e8f0fe', 'gridColor': '#dadce0', 'tertiaryColor': '#fbbc04', 'background': '#ffffff', 'secondaryColor': '#ea4335', 'fontFamily': 'Arial, sans-serif', 'activationBorderColor': '#ff6b6b', 'activationBkgColor': '#ffe6e6'}}}%%
 
 sequenceDiagram
     autonumber
