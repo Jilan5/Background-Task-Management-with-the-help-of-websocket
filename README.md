@@ -1,229 +1,295 @@
 # Tutorial: Building a Scalable Background Task Processing System with WebSockets, Celery, Redis, and FastAPI
 
 ## Objectives
-By the end of this tutorial, you will be able to:
-1. Understand the architecture and components of a scalable background task processing system.
-2. Implement WebSocket integration in FastAPI for real-time updates.
-3. Use Celery and Redis for task management and message brokering.
-4. Auto-scale Celery workers to handle dynamic workloads.
-5. Deploy the application to AWS with multi-instance scaling.
+In this tutorial, you will:
+1. Learn how to implement WebSocket integration in FastAPI for real-time task updates.
+2. Utilize Celery and Redis for task management and message brokering.
+3. Set up Docker to containerize the application and make it scalable.
+4. Integrate Celery workers and learn how to scale them horizontally.
 
 ---
 
 ## Introduction
 
-Modern web applications often require background task processing for resource-intensive or time-consuming operations. Examples include video encoding, file processing, or periodic data updates. This tutorial will guide you step-by-step to build a scalable system using **FastAPI**, **WebSockets**, **Celery**, **Redis**, and **Docker**.
+Modern applications often require background task processing for handling long-running or resource-intensive operations, such as file processing, sending emails, or generating reports. This tutorial guides you step-by-step to build a FastAPI application that uses:
+- **WebSockets** for real-time updates.
+- **Celery** for background task processing.
+- **Redis** as the message broker.
+- **Docker Compose** for containerized deployment.
 
-We'll also explore how WebSockets enable real-time task updates for clients and how Celery workers can be scaled for high throughput.
+By the end of this tutorial, you will have a fully functional application running in Docker that can scale to handle multiple tasks concurrently.
 
 ---
 
 ## Table of Contents
 
 1. [System Architecture](#system-architecture)
-2. [Setting Up the Environment](#setting-up-the-environment)
-3. [Implementing WebSocket Integration](#implementing-websocket-integration)
-4. [Integrating Celery for Background Tasks](#integrating-celery-for-background-tasks)
-5. [Auto-Scaling Celery Workers](#auto-scaling-celery-workers)
-6. [Deploying to AWS EC2 with Scaling](#deploying-to-aws-ec2-with-scaling)
-7. [Testing WebSocket and Scaling](#testing-websocket-and-scaling)
+2. [Setting Up the Project](#setting-up-the-project)
+3. [Implementing the Application](#implementing-the-application)
+    - [FastAPI WebSocket Integration](#fastapi-websocket-integration)
+    - [Celery Task Processing](#celery-task-processing)
+4. [Setting Up Docker](#setting-up-docker)
+5. [Scaling Celery Workers](#scaling-celery-workers)
+6. [Testing the Application](#testing-the-application)
 
 ---
 
 ## System Architecture
 
-Before diving into implementation, let’s understand the architecture:
+### Overview
 
-1. **FastAPI**: Handles client requests and exposes WebSocket endpoints for real-time updates.
-2. **Redis**: Acts as the message broker for Celery and also as a pub/sub system for WebSocket updates.
-3. **Celery**: Executes background tasks, offloading work from the main application thread.
-4. **WebSockets**: Provides real-time communication between the server and clients.
-5. **Docker**: Simplifies environment management and deployment.
-6. **AWS**: Hosts the application and enables scaling with multiple EC2 instances.
+The application consists of:
+1. **FastAPI**: Handles HTTP requests and WebSocket connections.
+2. **Redis**: Acts as a message broker and pub/sub system for real-time updates.
+3. **Celery**: Processes background tasks.
+4. **Docker Compose**: Orchestrates the application components.
 
-![Architecture Diagram Placeholder](#)  
-(Insert architecture diagram here)
+### Workflow
+
+1. The client sends a request to create a background task.
+2. FastAPI creates the task and returns a `task_id`.
+3. Celery workers execute the task and publish progress updates to Redis.
+4. FastAPI listens to Redis and broadcasts updates to clients via WebSockets.
+5. The client receives real-time updates about task progress.
 
 ---
 
-## Setting Up the Environment
+## Setting Up the Project
 
-### 1. Prerequisites
-- Python 3.11 or higher
-- Docker and Docker Compose
-- Basic understanding of FastAPI, Celery, and WebSockets
-- AWS account for deployment
+### Directory Structure
 
-### 2. Clone the Repository
-Clone the repository to your local machine:
-```bash
-git clone https://github.com/YourUsername/YourRepository.git
-cd YourRepository
+The project will have the following structure:
 ```
-
-### 3. Install Dependencies
-Create a virtual environment and install dependencies:
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 4. Start Docker Services
-Build and start the services using Docker Compose:
-```bash
-docker-compose up --build
+.
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── celery_worker.py
+│   ├── templates/
+│   │   └── index.html
+│   ├── static/
+│       └── css/
+│           └── styles.css
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
 ```
 
 ---
 
-## Implementing WebSocket Integration
+## Implementing the Application
 
-### What Are WebSockets?
+### 1. FastAPI WebSocket Integration
 
-WebSockets provide a full-duplex communication channel over a single TCP connection. Unlike HTTP, which is request-response-based, WebSockets allow the server to push updates to the client in real-time.
-
-### How WebSockets Are Used in This Application
-
-In this application:
-- A **WebSocket endpoint** is exposed at `/ws`.
-- Clients connect to this endpoint and listen for updates.
-- Redis publishes task progress updates, which are then broadcast via WebSockets.
-
-### Server-Side Implementation
-
-1. **Connection Manager**: Manages active WebSocket connections.
-2. **WebSocket Endpoint**: Handles client connections and disconnections.
-3. **Redis Listener**: Listens for task updates on the "task_status" Redis channel and broadcasts them to connected clients.
+#### File: `app/main.py`
 
 ```python name=app/main.py
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+import redis
+import asyncio
+import logging
+import os
+from app.celery_worker import create_task
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# FastAPI app initialization
+app = FastAPI(title="Background Task Example")
+templates = Jinja2Templates(directory="app/templates")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# Redis configuration
+redis_host = os.getenv("REDIS_HOST", "redis")
+redis_client = redis.Redis(host=redis_host, port=6379, decode_responses=True)
+pubsub = redis_client.pubsub()
+pubsub.subscribe("task_status")
+
+# WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_text(message)
+
+manager = ConnectionManager()
+
+# Redis listener to publish updates via WebSockets
+async def redis_listener():
+    async def listen():
+        while True:
+            message = pubsub.get_message(ignore_subscribe_messages=True)
+            if message:
+                data = message.get("data")
+                if data:
+                    await manager.broadcast(data)
+            await asyncio.sleep(0.01)
+
+    asyncio.create_task(listen())
+
+@app.on_event("startup")
+async def startup_event():
+    await redis_listener()
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            data = await websocket.receive_text()
-            logger.info(f"Received WebSocket data: {data}")
+            await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-```
 
-**Client-Side Implementation**  
-```javascript
-const ws = new WebSocket(`ws://${window.location.host}/ws`);
-ws.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    console.log('Task Update:', data);
-};
+@app.post("/tasks")
+async def add_task(background_tasks: BackgroundTasks):
+    task = create_task.delay(10)
+    return {"task_id": task.id, "status": "Task started"}
+
+@app.get("/tasks/{task_id}")
+async def get_task_status(task_id: str):
+    task = create_task.AsyncResult(task_id)
+    return {"task_id": task_id, "status": task.status, "result": task.result}
 ```
 
 ---
 
-## Integrating Celery for Background Tasks
+### 2. Celery Task Processing
 
-### What Is Celery?
+#### File: `app/celery_worker.py`
 
-Celery is an asynchronous task queue/job queue based on distributed message passing. It enables you to offload tasks to worker processes, freeing your main application thread for other operations.
-
-### How Celery Works with Redis
-
-1. **Redis** acts as a broker to pass messages between FastAPI and Celery workers.
-2. Workers pull tasks from the Redis queue and execute them asynchronously.
-
-### Task Implementation
-
-Define a task in `celery_worker.py`:
 ```python name=app/celery_worker.py
+from celery import Celery
+import time
+import redis
+import json
+import os
+
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+celery = Celery("tasks", broker=f"redis://{REDIS_HOST}:6379/0", backend=f"redis://{REDIS_HOST}:6379/0")
+
+redis_client = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=True)
+
 @celery.task(name="create_task", bind=True)
 def create_task(self, task_length):
     for i in range(task_length):
-        self.update_state(state="PROGRESS", meta={"progress": i})
+        progress = int((i + 1) * 100 / task_length)
+        self.update_state(state="PROGRESS", meta={"progress": progress})
+        redis_client.publish("task_status", json.dumps({"task_id": self.request.id, "progress": progress}))
         time.sleep(1)
     return {"status": "Task completed"}
 ```
 
 ---
 
-## Auto-Scaling Celery Workers
+## Setting Up Docker
 
-### Why Auto-Scaling?
+### 1. Create `Dockerfile`
 
-Auto-scaling adjusts the number of Celery workers based on workload, ensuring efficient resource usage and high performance during peak loads.
+```dockerfile name=Dockerfile
+FROM python:3.11-slim
 
-### Scaling with Docker Compose
+WORKDIR /app
 
-Scale workers using the `--scale` flag:
-```bash
-docker-compose up --scale celery-worker=5
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-### Scaling in AWS
+### 2. Create `docker-compose.yml`
 
-Use AWS Auto Scaling Groups to dynamically add or remove EC2 instances based on:
-- CPU usage
-- Redis queue length
+```yaml name=docker-compose.yml
+version: '3.8'
 
-(Insert workflow diagram for scaling)
+services:
+  web:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - worker
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  worker:
+    build: .
+    command: celery -A app.celery_worker worker --loglevel=info
+    depends_on:
+      - redis
+```
+
+### 3. Create `requirements.txt`
+
+```text name=requirements.txt
+fastapi
+uvicorn
+celery
+redis
+jinja2
+```
 
 ---
 
-## Deploying to AWS EC2 with Scaling
+## Scaling Celery Workers
 
-### 1. Set Up Infrastructure
+Scale Celery workers using Docker Compose:
 
-1. **Create an ElastiCache Redis Cluster**: Use AWS ElastiCache to replace the local Redis container.
-2. **Launch EC2 Instances**: Deploy separate instances for web servers and workers.
+```bash
+docker-compose up --scale worker=3
+```
 
-### 2. Configure Security Groups
+---
 
-- Allow Redis traffic only from web and worker instances.
-- Open ports 8000 (HTTP) and 5555 (Flower) for external access.
+## Testing the Application
 
-### 3. Deploy Docker Containers
-
-Run the following on each EC2 instance:
+### Start the Application
+Run the application using:
 ```bash
 docker-compose up --build
 ```
 
----
-
-## Testing WebSocket and Scaling
-
-### WebSocket Testing
-
-```bash
-npm install -g wscat
-wscat -c ws://<your-server-ip>:8000/ws
+### Access the Web Interface
+Open your browser and go to:
+```
+http://localhost:8000
 ```
 
-### Scaling Test
-
-1. Start a large number of tasks:
-```bash
-for i in {1..100}; do curl -X POST http://<your-server-ip>:8000/tasks; done
-```
-
-2. Monitor worker activity on Flower:
-```bash
-http://<your-server-ip>:5555
-```
+### Test WebSocket Integration
+1. Open the developer console in your browser.
+2. Go to the "Network" tab and filter for "WS" (WebSocket).
+3. Start a task and observe WebSocket messages in real time.
 
 ---
 
-## Placeholder for Diagrams
+## Next Steps
 
-- **Architecture Diagram**
-- **Workflow Diagram**
-- **Sequence Diagram**
-
----
-
-## Conclusion
-
-In this tutorial, you learned how to build a scalable background task processing system with WebSockets, Celery, Redis, and FastAPI. You also explored auto-scaling strategies and deployed the application to AWS EC2.
-
-Feel free to extend this project by:
-- Adding more task types and queues.
-- Enhancing WebSocket authentication.
-- Deploying with Kubernetes for better orchestration.
+In the next tutorial, we will cover:
+- Deploying this application to AWS EC2.
+- Setting up auto-scaling for Celery workers in the cloud.
+- Monitoring task performance and Redis metrics.
