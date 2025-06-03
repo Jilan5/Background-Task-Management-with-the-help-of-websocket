@@ -1,7 +1,7 @@
 # Tutorial: Building a Scalable Background Task Processing System with WebSockets, Celery, Redis, and FastAPI
 
 ## Objectives
-In this tutorial, you will:
+In this tutorial, we will:
 1. Learn how to implement WebSocket integration in FastAPI for real-time task updates.
 2. Utilize Celery and Redis for task management and message brokering.
 3. Set up Docker to containerize the application and make it scalable.
