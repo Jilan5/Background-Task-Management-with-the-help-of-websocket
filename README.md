@@ -1,17 +1,64 @@
 # Tutorial: Building a Scalable Background Task Processing System with WebSockets, Celery, Redis, and FastAPI
 
 ## Objectives
-In this tutorial, you will:
+In this tutorial, we will:
 1. Learn how to implement WebSocket integration in FastAPI for real-time task updates.
 2. Utilize Celery and Redis for task management and message brokering.
 3. Set up Docker to containerize the application and make it scalable.
 4. Integrate Celery workers and learn how to scale them horizontally.
 
 ---
+---
+
+## Introduction
+
+Modern applications often require background task processing for handling long-running or resource-intensive operations, such as file processing, sending emails, or generating reports. This tutorial guides you step-by-step to build a FastAPI application that uses:
+- **WebSockets** for real-time updates.
+- **Celery** for background task processing.
+- **Redis** as the message broker.
+- **Docker Compose** for containerized deployment.
+
+By the end of this tutorial, you will have a fully functional application running in Docker that can scale to handle multiple tasks concurrently.
+
+---
+
+## Table of Contents
+
+1. [System Architecture](#system-architecture)
+2. [Setting Up the Project](#setting-up-the-project)
+3. [Implementing the Application](#implementing-the-application)
+    - [FastAPI WebSocket Integration](#fastapi-websocket-integration)
+    - [Celery Task Processing](#celery-task-processing)
+4. [Setting Up Docker](#setting-up-docker)
+5. [Scaling Celery Workers](#scaling-celery-workers)
+6. [Testing the Application](#testing-the-application)
+
+---
+
+## System Architecture
+
+### Overview
+
+The application consists of:
+1. **FastAPI**: Handles HTTP requests and WebSocket connections.
+2. **Redis**: Acts as a message broker and pub/sub system for real-time updates.
+3. **Celery**: Processes background tasks.
+4. **Docker Compose**: Orchestrates the application components.
+
+### Workflow
+
+1. The client sends a request to create a background task.
+2. FastAPI creates the task and returns a `task_id`.
+3. Celery workers execute the task and publish progress updates to Redis.
+4. FastAPI listens to Redis and broadcasts updates to clients via WebSockets.
+5. The client receives real-time updates about task progress.
+
+---
 
 ## Setting Up the Project
 
 ### Directory Structure
+
 
 The project will have the following structure:
 ```
