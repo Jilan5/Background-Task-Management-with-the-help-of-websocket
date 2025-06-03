@@ -41,6 +41,7 @@ The application consists of:
 5. The client receives real-time updates about task progress.
 
 ### Combining Docker Architecture with Scaling and WebSocket Workflow
+```mermaid
 %%{init: {'theme': 'default', 'themeVariables': {'primaryColor': '#ffcc00', 'edgeLabelBackground':'#ffffff', 'tertiaryColor': '#f0f0f0'}}}%%
 %%{config: {'flowchart': {'curve': 'linear'}}}%%
 %%{flowchart: {'nodeSpacing': 50, 'rankSpacing': 50}}%%
@@ -66,9 +67,11 @@ graph TD
     style D fill:#4e9e40,stroke:#3b7830,color:white,stroke-width:2px %% Celery worker green color
     style E fill:#4e9e40,stroke:#3b7830,color:white,stroke-width:2px %% Celery worker green color
     style Client fill:#4285F4,stroke:#3367d6,color:white,stroke-width:2px %% Browser blue color
+```
 
 ### Visualizing Docker Container Architecture and Connections
-
+```mermaid
+```
 
 ### Visualizing Celery Worker Scaling
 ### WebSockets vs HTTP Polling for Task Updates
