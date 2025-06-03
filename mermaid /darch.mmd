@@ -1,0 +1,45 @@
+%%{init: {'theme': 'default', 'themeVariables': {'primaryColor': '#ffcc00', 'edgeLabelBackground':'#ffffff', 'tertiaryColor': '#f0f0f0'}}}%%
+%%{config: {'flowchart': {'curve': 'cardinal', 'padding': 20}}}%%
+%%{flowchart: {'nodeSpacing': 80, 'rankSpacing': 120}}%%
+%%{flowchart: {'defaultRenderer': 'dagre'}}%%
+
+graph TD
+    subgraph Docker["🐳 Docker Environment"]
+        A["Web Container<br/>(FastAPI Server)"] 
+        B["Redis Container<br/>(Message Broker)"]
+        C["Worker Container<br/>(Celery Worker)"]
+    end
+    
+    Client["📱 Client<br/>(Browser/App)"]
+
+    %% Bold contrasting arrows
+    A ==>|"Publishes Tasks"| B
+    B ==>|"Sends Task to Process"| C
+    C -.->|"Publishes Progress"| B
+    B -.->|"Updates via Pub/Sub"| A
+    
+    %% Client interactions
+    Client ==>|"HTTP Request"| A
+    A -.->|"🔄 WebSocket Updates"| Client
+
+    %% Enhanced styling
+    classDef fastApiStyle fill:#009688,stroke:#007566,color:white,stroke-width:3px
+    classDef redisStyle fill:#DC382D,stroke:#a9291f,color:white,stroke-width:3px
+    classDef celeryStyle fill:#4e9e40,stroke:#3b7830,color:white,stroke-width:3px
+    classDef clientStyle fill:#4285F4,stroke:#3367d6,color:white,stroke-width:3px
+    classDef dockerStyle fill:#E6F3FF,stroke:#2496ED,color:#333,stroke-width:2px,fill-opacity:0.3
+
+    %% Apply styles
+    class A fastApiStyle
+    class B redisStyle
+    class C celeryStyle
+    class Client clientStyle
+    class Docker dockerStyle
+
+    %% Bold contrasting arrow styles
+    linkStyle 0 stroke:#FF0000,stroke-width:3px
+    linkStyle 1 stroke:#FF6600,stroke-width:3px
+    linkStyle 2 stroke:#0066FF,stroke-width:2px,stroke-dasharray: 8 4
+    linkStyle 3 stroke:#9900FF,stroke-width:2px,stroke-dasharray: 8 4
+    linkStyle 4 stroke:#00CC00,stroke-width:3px
+    linkStyle 5 stroke:#FF3366,stroke-width:2px,stroke-dasharray: 8 4

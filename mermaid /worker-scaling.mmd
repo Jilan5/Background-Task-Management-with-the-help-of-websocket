@@ -1,0 +1,48 @@
+%%{init: {'theme': 'default', 'themeVariables': {'primaryColor': '#4285f4', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#1a73e8', 'lineColor': '#34a853', 'sectionBkgColor': '#f8f9fa', 'altSectionBkgColor': '#e8f0fe', 'gridColor': '#dadce0', 'tertiaryColor': '#fbbc04', 'background': '#ffffff', 'secondaryColor': '#ea4335', 'fontFamily': 'Arial, sans-serif'}}}%%
+%%{config: {'flowchart': {'curve': 'basis', 'padding': 20}}}%%
+%%{flowchart: {'nodeSpacing': 80, 'rankSpacing': 100}}%%
+
+graph TD
+    subgraph Redis["🔄 Redis Broker"]
+        A["📋 Task Queue<br/>Central Message Hub"]
+    end
+    
+    subgraph Workers["⚙️ Worker Pool"]
+        B["🔨 Worker 1<br/>Processing Tasks"]
+        C["🔨 Worker 2<br/>Processing Tasks"] 
+        D["🔨 Worker N<br/>Processing Tasks"]
+    end
+    
+    subgraph Web["🌐 Web Layer"]
+        E["🚀 FastAPI Server<br/>REST & WebSocket"]
+    end
+    
+    subgraph Client["👤 Client Side"]
+        F["📱 Browser/App<br/>Real-time Updates"]
+    end
+
+    %% Task flow
+    E -->|"📤 Publish Tasks"| A
+    A -->|"⚡ Assign"| B
+    A -->|"⚡ Assign"| C  
+    A -->|"⚡ Assign"| D
+    
+    %% Progress updates
+    B -->|"📊 Progress Updates"| A
+    C -->|"📊 Progress Updates"| A
+    D -->|"📊 Progress Updates"| A
+    
+    %% Client communication
+    A -->|"📢 Status Updates"| E
+    E -.->|"🔄 WebSocket Stream"| F
+
+    %% Styling
+    classDef redisStyle fill:#ff6b6b,stroke:#d63031,stroke-width:3px,color:#fff
+    classDef workerStyle fill:#74b9ff,stroke:#0984e3,stroke-width:2px,color:#fff
+    classDef webStyle fill:#55a3ff,stroke:#2d3436,stroke-width:3px,color:#fff
+    classDef clientStyle fill:#fd79a8,stroke:#e84393,stroke-width:2px,color:#fff
+
+    class A redisStyle
+    class B,C,D workerStyle
+    class E webStyle
+    class F clientStyle

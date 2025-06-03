@@ -1,0 +1,58 @@
+
+
+services:
+  web:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  celery-worker:
+    build: .
+    # Enable events for better Flower monitoring
+    command: celery -A app.celery_worker worker --loglevel=info --events
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - C_FORCE_ROOT=true  # To handle the superuser warning
+    deploy:
+      replicas: 2  # Default number of replicas
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+
+  flower:
+    build: .
+    command: celery --broker=redis://redis:6379/0 -A app.celery_worker flower --port=5555
+    ports:
+      - "5555:5555"
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - celery-worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+volumes:
+  redis_data:

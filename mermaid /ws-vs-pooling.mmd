@@ -1,0 +1,52 @@
+%%{init: {'theme': 'default', 'themeVariables': {'primaryColor': '#4285f4', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#1a73e8', 'lineColor': '#34a853', 'sectionBkgColor': '#f8f9fa', 'altSectionBkgColor': '#e8f0fe', 'gridColor': '#dadce0', 'tertiaryColor': '#fbbc04', 'background': '#ffffff', 'secondaryColor': '#ea4335', 'fontFamily': 'Arial, sans-serif', 'activationBorderColor': '#ff6b6b', 'activationBkgColor': '#ffe6e6'}}}%%
+
+sequenceDiagram
+    autonumber
+    participant C as 📱 Client
+    participant WS as 🚀 WebServer
+    participant R as 🔄 Redis
+    participant W as 🔨 Worker
+
+    Note over C,W: 🔄 **HTTP Polling Approach** 🔄
+    
+    rect rgb(255, 245, 245)
+        C->>+WS: 📤 POST /tasks
+        WS->>+R: 📋 Publish Task ➡️
+        R->>+W: ⚡ Assign Task
+        W-->>-R: 📊 Progress Update ↗️
+        R-->>-WS: ✅ Task Created
+        WS-->>-C: 🆔 Task ID Response
+        
+        loop 🔄 Continuous Polling (Every 2-5s)
+            C->>+WS: 🔍 GET /tasks/{task_id}
+            WS->>+R: 📊 Get Progress
+            R-->>-WS: 📈 Progress Data
+            WS-->>-C: 📋 Response with Progress
+            Note right of C: ⏱️ Wait 2-5 seconds
+        end
+    end
+
+    Note over C,W: ⚡ **WebSocket Real-time Approach** ⚡
+    
+    rect rgb(240, 255, 245)
+        C->>+WS: 🔌 WebSocket Connection
+        WS-->>-C: ✅ Connection Established
+        
+        C->>+WS: 📤 POST /tasks
+        WS->>+R: 📋 Publish Task ➡️
+        R->>+W: ⚡ Assign Task
+        WS-->>C: 🆔 Task ID Response
+        
+        loop 🚀 Real-time Updates (Instant)
+            W-->>R: 📊 Progress Update ↗️
+            R-->>WS: 📢 Publish Progress Event 🚀
+            WS-->>C: 📡 WebSocket Message (Instant)
+        end
+        
+        W-->>R: ✅ Task Completed
+        R-->>WS: 🎉 Completion Event
+        WS-->>C: ✅ Task Complete Notification
+    end
+
+    Note over C,W: 📊 **Comparison Summary** 📊
+    Note over C,WS: 🔄 Polling: Multiple requests, delay<br/>⚡ WebSocket: Single connection, instant
