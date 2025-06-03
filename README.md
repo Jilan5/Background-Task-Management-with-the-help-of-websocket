@@ -420,10 +420,10 @@ Open your browser and go to:
 ```
 http://localhost:8000
 ```
-
-**Description:**
-- Access the FastAPI web interface to interact with the application.
-
+### Access the FLOWER Interface
+```
+http://localhost:5555
+```
 ---
 
 ### Test WebSocket Integration
@@ -434,11 +434,3 @@ http://localhost:8000
 **Description:**
 - Verify that the WebSocket connection is established and receiving real-time updates for task progress.
 
----
-
-## Next Steps
-
-In the next tutorial, we will cover:
-- Deploying this application to AWS EC2.
-- Setting up auto-scaling for Celery workers in the cloud.
-- Monitoring task performance and Redis metrics.
