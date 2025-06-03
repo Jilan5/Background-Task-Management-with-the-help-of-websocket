@@ -420,10 +420,17 @@ Open your browser and go to:
 ```
 http://localhost:8000
 ```
+![image](https://github.com/user-attachments/assets/e02bb32d-0887-4f07-ba36-fa1b454ec224)
+![image](https://github.com/user-attachments/assets/a69a1aa3-d501-472a-8929-e28a50216136)
+
+
 ### Access the FLOWER Interface
 ```
 http://localhost:5555
 ```
+![image](https://github.com/user-attachments/assets/bf745dc6-c89c-4847-9d15-ebb12bac918a)
+![image](https://github.com/user-attachments/assets/ce62a54c-c3ea-44b5-a0bd-4340ee7b24ca)
+
 ---
 
 ### Test WebSocket Integration
