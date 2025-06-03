@@ -22,19 +22,6 @@ By the end of this tutorial, you will have a fully functional application runnin
 
 ---
 
-## Table of Contents
-
-1. [System Architecture](#system-architecture)
-2. [Setting Up the Project](#setting-up-the-project)
-3. [Implementing the Application](#implementing-the-application)
-    - [FastAPI WebSocket Integration](#fastapi-websocket-integration)
-    - [Celery Task Processing](#celery-task-processing)
-4. [Setting Up Docker](#setting-up-docker)
-5. [Scaling Celery Workers](#scaling-celery-workers)
-6. [Testing the Application](#testing-the-application)
-
----
-
 ## System Architecture
 
 ### Overview
