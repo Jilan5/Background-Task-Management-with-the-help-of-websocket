@@ -170,8 +170,7 @@ graph TD
     class F clientStyle
 ```
 ### WebSockets vs HTTP Polling for Task Updates
-```mermaid
-%%{init: {'theme': 'default', 'themeVariables': {'primaryColor': '#4285f4', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#1a73e8', 'lineColor': '#34a853', 'sectionBkgColor': '#f8f9fa', 'altSectionBkgColor': '#e8f0fe', 'gridColor': '#dadce0', 'tertiaryColor': '#fbbc04', 'background': '#ffffff', 'secondaryColor': '#ea4335', 'fontFamily': 'Arial, sans-serif', 'activationBorderColor': '#ff6b6b', 'activationBkgColor': '#ffe6e6'}}}%%
+```mermaid%%{init: {'theme': 'default', 'themeVariables': {'primaryColor': '#4285f4', 'primaryTextColor': '#ffffff', 'primaryBorderColor': '#1a73e8', 'lineColor': '#34a853', 'sectionBkgColor': '#f8f9fa', 'altSectionBkgColor': '#e8f0fe', 'gridColor': '#dadce0', 'tertiaryColor': '#fbbc04', 'background': '#ffffff', 'secondaryColor': '#ea4335', 'fontFamily': 'Arial, sans-serif', 'activationBorderColor': '#ff6b6b', 'activationBkgColor': '#ffe6e6'}}}%%
 
 sequenceDiagram
     autonumber
@@ -189,9 +188,7 @@ sequenceDiagram
         W-->>-R: 📊 Progress Update ↗️
         R-->>-WS: ✅ Task Created
         WS-->>-C: 🆔 Task ID Response
-    end
-    
-    rect rgb(255, 250, 240)
+        
         loop 🔄 Continuous Polling (Every 2-5s)
             C->>+WS: 🔍 GET /tasks/{task_id}
             WS->>+R: 📊 Get Progress
@@ -211,9 +208,7 @@ sequenceDiagram
         WS->>+R: 📋 Publish Task ➡️
         R->>+W: ⚡ Assign Task
         WS-->>C: 🆔 Task ID Response
-    end
-    
-    rect rgb(240, 248, 255)
+        
         loop 🚀 Real-time Updates (Instant)
             W-->>R: 📊 Progress Update ↗️
             R-->>WS: 📢 Publish Progress Event 🚀
