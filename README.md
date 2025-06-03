@@ -218,7 +218,6 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ### 2. Create `docker-compose.yml`
 
 ```yaml name=docker-compose.yml
-version: '3.8'
 
 services:
   web:
